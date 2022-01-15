@@ -97,13 +97,13 @@ class Game:
         velocity = self.player_dot.get_velocity()
         # keys that move player ball
         if event.key == pygame.K_UP:
-            self.player_dot.set_velocity((0, -3))
+            self.player_dot.set_velocity((0, -4))
         if event.key == pygame.K_DOWN:
-            self.player_dot.set_velocity((0, 3))
+            self.player_dot.set_velocity((0, 4))
         if event.key == pygame.K_LEFT:
-            self.player_dot.set_velocity((-3, 0))
+            self.player_dot.set_velocity((-4, 0))
         if event.key == pygame.K_RIGHT:
-            self.player_dot.set_velocity((3, 0))
+            self.player_dot.set_velocity((4, 0))
         # key that shoots
         if event.key == pygame.K_SPACE:
             if velocity != [0, 0]:
@@ -128,7 +128,7 @@ class Game:
         for bullet in self.player_bullets:
             bullet.draw()
             for enemy in self.enemy_dots:
-                bullet.check_shot(enemy)
+                bullet.check_player_shot(enemy)
 
         for enemy in self.enemy_dots:
             enemy.draw()
@@ -147,6 +147,9 @@ class Game:
         self.player_dot.boundary_stop()
         for bullet in self.player_bullets:
             bullet.move()
+        for enemy in self.enemy_dots:
+            enemy.move()
+            enemy.boundary_stop()
         self.frame_counter = self.frame_counter + 1
 
     def decide_continue(self):
@@ -176,6 +179,7 @@ class Dot:
         self.velocity = dot_velocity
         self.surface = surface
         self.status = status
+
         self.shot_yes = False
 
     def move(self):
@@ -239,10 +243,13 @@ class Dot:
                                 self.surface.get_height())
         for i in range(0, 2):
             if self.center[i] <= self.radius or self.center[i] + self.radius >= surface_width_height[i]:
-                self.velocity[i] = 0
+                if self.status == 'player':  # if player, stop movement
+                    self.velocity[i] = 0
+                elif self.status == 'enemy':  # if enemy, bounce
+                    self.velocity[i] = -self.velocity[i]
 
-    def check_shot(self, other):
-        # checks if another dot has hit you
+    def check_player_shot(self, other):
+        # checks if a player dot's buller has hit an enemy
         # changes self.shot accordingly
         # check left side
         if other.get_center()[0] + other.get_radius() >= self.center[0] - self.radius:
@@ -252,8 +259,9 @@ class Dot:
                 if other.get_center()[1] + other.get_radius() >= self.center[1] - self.radius:
                     # check bottom side
                     if other.get_center()[1] - other.get_radius() <= self.center[1] + self.radius:
-                        self.shot()
-                        other.shot()
+                        if self.color == other.get_color() and not self.shot_yes:  # if hits opposite color, then other dot dies
+                            other.shot()
+                        self.shot()  # disapear bullet no matter what
 
 
 main()
