@@ -1,4 +1,5 @@
 import pygame
+import random
 
 
 # User-defined functions
@@ -41,10 +42,23 @@ class Game:
         self.continue_game = True
 
         # === game specific objects
-        self.player_dot = Dot('red', 10, [self.surface.get_width(
-        ) // 2, self.surface.get_height() // 2], [0, 0], self.surface)
+        self.player_dot = Dot(pygame.Color('red'), 10, [self.surface.get_width(
+        ) // 2, self.surface.get_height() // 2], [0, 0], self.surface, 'player')
 
         self.player_bullets = []
+
+        self.number_enemies = 10
+        enemy_colors = ['red', 'green', 'orange']
+        self.enemy_dots = []
+        for i in range(self.number_enemies + 1):
+            color = random.choice(enemy_colors)
+            radius = 15
+            x = random.randint(radius, self.surface.get_width() - radius)
+            y = random.randint(radius, self.surface.get_height() - radius)
+            velocity_choices = [[0, 3], [0, -3], [3, 0], [-3, 0]]
+            enemy = Dot(pygame.Color(color), radius, [
+                        x, y], random.choice(velocity_choices), self.surface, 'enemy')
+            self.enemy_dots.append(enemy)
 
         self.max_frames = 150
         self.frame_counter = 0
@@ -81,6 +95,7 @@ class Game:
         color = self.player_dot.get_color()
         center = self.player_dot.get_center()
         velocity = self.player_dot.get_velocity()
+        # keys that move player ball
         if event.key == pygame.K_UP:
             self.player_dot.set_velocity((0, -3))
         if event.key == pygame.K_DOWN:
@@ -89,9 +104,19 @@ class Game:
             self.player_dot.set_velocity((-3, 0))
         if event.key == pygame.K_RIGHT:
             self.player_dot.set_velocity((3, 0))
+        # key that shoots
         if event.key == pygame.K_SPACE:
-            bullet = Bullet(color, 5, center, velocity, self.surface)
-            self.player_bullets.append(bullet)
+            if velocity != [0, 0]:
+                bullet = Dot(color, 5, center, velocity,
+                             self.surface, 'bullet')
+                self.player_bullets.append(bullet)
+        # keys that change player ball color
+        if event.key == pygame.K_x:
+            self.player_dot.set_color(pygame.Color('red'))
+        if event.key == pygame.K_c:
+            self.player_dot.set_color(pygame.Color('orange'))
+        if event.key == pygame.K_v:
+            self.player_dot.set_color(pygame.Color('green'))
 
     def draw(self):
         # Draw all game objects.
@@ -102,6 +127,11 @@ class Game:
         self.player_dot.draw()
         for bullet in self.player_bullets:
             bullet.draw()
+            for enemy in self.enemy_dots:
+                bullet.check_shot(enemy)
+
+        for enemy in self.enemy_dots:
+            enemy.draw()
 
         # reset self.player_bullets after so many bullets have been shot
         if len(self.player_bullets) > 150:
@@ -129,7 +159,7 @@ class Game:
 class Dot:
     # An object in this class represents a Dot that moves
 
-    def __init__(self, dot_color, dot_radius, dot_center, dot_velocity, surface):
+    def __init__(self, dot_color, dot_radius, dot_center, dot_velocity, surface, status):
         # Initialize a Dot.
         # - self is the Dot to initialize
         # - color is the pygame.Color of the dot
@@ -138,12 +168,15 @@ class Dot:
         # - radius is the int pixel radius of the dot
         # - velocity is a list containing the x and y components
         # - surface is the window's pygame.Surface object
+        #   status is what type of dot it is
 
-        self.color = pygame.Color(dot_color)
+        self.color = dot_color
         self.radius = dot_radius
         self.center = dot_center
         self.velocity = dot_velocity
         self.surface = surface
+        self.status = status
+        self.shot_yes = False
 
     def move(self):
         # Change the location of the Dot by adding the corresponding
@@ -156,8 +189,12 @@ class Dot:
     def draw(self):
         # Draw the dot on the surface
         # - self is the Dot
-
-        pygame.draw.circle(self.surface, self.color, self.center, self.radius)
+        if self.shot_yes:
+            if self.status == 'enemy' or self.status == 'bullet':
+                pass
+        else:
+            pygame.draw.circle(self.surface, self.color,
+                               self.center, self.radius)
 
     def set_velocity(self, formula):
         # sets the velocity of the dot
@@ -174,12 +211,27 @@ class Dot:
         return velocity
 
     def get_color(self):
+        # gets the color of the dot
         return self.color
 
     def get_center(self):
+        # gets the center coordinates of the dot
         x = self.center[0]
         y = self.center[1]
         return [x, y]
+
+    def get_radius(self):
+        # gets the radius of the dot
+        return self.radius
+
+    def set_color(self, color):
+        # sets the color of the dot
+        # color is a pygame color
+        self.color = color
+
+    def shot(self):
+        # makes the dot be shot
+        self.shot_yes = True
 
     def boundary_stop(self):
         # checks if dot has hit boundary, and stops velocity if it has
@@ -189,39 +241,19 @@ class Dot:
             if self.center[i] <= self.radius or self.center[i] + self.radius >= surface_width_height[i]:
                 self.velocity[i] = 0
 
-
-class Bullet:
-    # An object in this class represents a Bullet that moves
-
-    def __init__(self, dot_color, dot_radius, dot_center, dot_velocity, surface):
-        # Initialize a Dot.
-        # - self is the Dot to initialize
-        # - color is the pygame.Color of the dot
-        # - center is a list containing the x and y int
-        #   coords of the center of the dot
-        # - radius is the int pixel radius of the dot
-        # - velocity is a list containing the x and y components
-        # - surface is the window's pygame.Surface object
-
-        self.color = dot_color
-        self.radius = dot_radius
-        self.center = dot_center
-        self.velocity = dot_velocity
-        self.surface = surface
-
-    def move(self):
-        # Change the location of the Dot by adding the corresponding
-        # speed values to the x and y coordinate of its center
-        # - self is the Dot
-
-        for i in range(0, 2):
-            self.center[i] = (self.center[i] + self.velocity[i])
-
-    def draw(self):
-        # Draw the dot on the surface
-        # - self is the Dot
-
-        pygame.draw.circle(self.surface, self.color, self.center, self.radius)
+    def check_shot(self, other):
+        # checks if another dot has hit you
+        # changes self.shot accordingly
+        # check left side
+        if other.get_center()[0] + other.get_radius() >= self.center[0] - self.radius:
+            # check right side
+            if other.get_center()[0] - other.get_radius() <= self.center[0] + self.radius:
+                # check top side
+                if other.get_center()[1] + other.get_radius() >= self.center[1] - self.radius:
+                    # check bottom side
+                    if other.get_center()[1] - other.get_radius() <= self.center[1] + self.radius:
+                        self.shot()
+                        other.shot()
 
 
 main()
