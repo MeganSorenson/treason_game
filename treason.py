@@ -48,6 +48,8 @@ class Game:
 
         self.player_bullets = []
 
+        self.game_lives = 9
+
         # enemy things
         self.number_enemies = 10
         enemy_colors = ['red', 'green', 'orange']
@@ -57,14 +59,14 @@ class Game:
             radius = 15
             x = random.randint(radius, self.surface.get_width() - radius)
             y = random.randint(radius, self.surface.get_height() - radius)
-            velocity_choices = [[0, 3], [0, -3], [3, 0], [-3, 0]]
+            velocity_choices = [[-3, 0], [3, 0], [0, -3], [0, 3]]
             enemy = Dot(pygame.Color(color), radius, [
                         x, y], random.choice(velocity_choices), self.surface, 'enemy')
             self.enemy_dots.append(enemy)
 
         self.enemy_bullets = []
 
-        self.max_frames = 150
+        # other game things
         self.frame_counter = 0
 
     def play(self):
@@ -73,6 +75,7 @@ class Game:
 
         while not self.close_clicked:  # until player clicks close box
             # play frame
+            print(self.game_lives)
             self.handle_events()
             self.draw()
             if self.continue_game:
@@ -133,14 +136,15 @@ class Game:
         for bullet in self.player_bullets:
             bullet.draw()
             for enemy in self.enemy_dots:
-                bullet.check_player_shot(enemy)
+                bullet.check_bullet_shot(enemy, self.game_lives)
 
         # draw enemy things
         for enemy in self.enemy_dots:
             enemy.draw()
         for bullet in self.enemy_bullets:
             bullet.draw()
-            bullet.check_player_shot(self.player_dot)
+            self.game_lives = bullet.check_bullet_shot(
+                self.player_dot, self.game_lives)
 
         # draw game text
         if self.continue_game == False:
@@ -150,7 +154,7 @@ class Game:
         if len(self.player_bullets) > 150:
             for i in range(50):
                 self.player_bullets.pop(0)
-        if len(self.enemy_bullets) > 150:
+        if len(self.enemy_bullets) > 250:
             for i in range(50):
                 self.enemy_bullets.pop(0)
 
@@ -161,19 +165,19 @@ class Game:
         # - self is the Game to update
 
         # update player things
-        self.player_dot.move()
+        self.player_dot.move(self.frame_counter)
         self.player_dot.boundary_stop()
         for bullet in self.player_bullets:
-            bullet.move()
+            bullet.move(self.frame_counter)
 
         # update enemy things
         for enemy in self.enemy_dots:
-            enemy.move()
+            enemy.move(self.frame_counter)
             enemy.boundary_stop()
             # check if player dot in enemy range
-            should_enemy_shoot = enemy.check_player_shot(self.player_dot)
+            should_enemy_shoot = enemy.check_surroundings(self.player_dot)
             # if yes, shoot at player
-            if should_enemy_shoot:
+            if should_enemy_shoot and self.frame_counter % 10 == 0:
                 color = enemy.get_color()
                 center = enemy.get_center()
                 velocity = enemy.get_velocity()
@@ -182,7 +186,7 @@ class Game:
                 self.enemy_bullets.append(bullet)
 
         for bullet in self.enemy_bullets:
-            bullet.move()
+            bullet.move(self.frame_counter)
 
         self.frame_counter = self.frame_counter + 1
 
@@ -191,13 +195,20 @@ class Game:
         # - self is the Game to check
         self.continue_game = False
         for enemy in self.enemy_dots:
-            if not enemy.get_shot_status():
+            if not enemy.get_shot_status() and self.game_lives > 0:
                 self.continue_game = True
+        if self.game_lives <= 0:
+            self.end_game_reason = 'lives gone'
+        else:
+            self.end_game_reason = 'all dead'
 
     def display_game_over(self):
         # displays game over message at end of game
         words1 = 'GAME OVER'
-        words2 = 'successfully back-stabbed'
+        if self.end_game_reason == 'all dead':
+            words2 = 'successfully back-stabbed'
+        elif self.end_game_reason == 'lives gone':
+            words2 = 'all 9 lives gone'
         # set font characteristics
         font_size1 = 70
         font_size2 = 40
@@ -240,19 +251,25 @@ class Dot:
 
         self.shot_yes = False
 
-    def move(self):
+    def move(self, frames):
         # Change the location of the Dot by adding the corresponding
         # speed values to the x and y coordinate of its center
         # - self is the Dot
-        for i in range(0, 2):
-            self.center[i] = (self.center[i] + self.velocity[i])
+        if self.status != 'enemy':
+            for i in range(0, 2):
+                self.center[i] += self.velocity[i]
+        else:
+            if random.randint(1, 10) % 2 == 0 and frames % 120 == 0:
+                velocity_options = [[-3, 0], [3, 0], [0, -3], [0, 3]]
+                self.velocity = random.choice(velocity_options)
+            for i in range(0, 2):
+                self.center[i] += self.velocity[i]
 
     def draw(self):
         # Draw the dot on the surface
         # - self is the Dot
         if self.shot_yes:
-            if self.status == 'enemy' or self.status == 'bullet':
-                pass
+            pass
         else:
             pygame.draw.circle(self.surface, self.color,
                                self.center, self.radius)
@@ -313,32 +330,23 @@ class Dot:
                 elif self.status == 'enemy':  # if enemy, bounce
                     self.velocity[i] = -self.velocity[i]
 
-    def check_player_shot(self, other):
+    def check_bullet_shot(self, other, game_lives):
         # if self is a bullet --> checks if a bullet has hit an enemy
         #   changes self.shot accordingly
+        # returns true is a player was hit by an enemy bullet
+        if self.check_range(other, 'x') and self.check_range(other, 'y'):
+            if not self.shot_yes:  # if hits opposite color, then other dot dies
+                if self.color == other.get_color() and other.get_status != 'player':
+                    other.shot()
+                else:
+                    game_lives -= 1
+            if not other.get_shot_status():
+                self.shot()  # disapear bullet no matter what as long as other thing is not already shot
+        return game_lives
+
+    def check_surroundings(self, other):
         # if self is an enemy -- > checks if another dot in extended surroundings (in direction of movement),
         #   returns if yes (bool)
-        if self.status == 'player_bullet' or self.status == 'enemy_bullet':
-            # check left side
-            if other.get_center()[0] + other.get_radius() >= self.center[0] - self.radius:
-                # check right side
-                if other.get_center()[0] - other.get_radius() <= self.center[0] + self.radius:
-                    # check top side
-                    if other.get_center()[1] + other.get_radius() >= self.center[1] - self.radius:
-                        # check bottom side
-                        if other.get_center()[1] - other.get_radius() <= self.center[1] + self.radius:
-                            if self.status == 'player_bullet':
-                                if self.color == other.get_color() and not self.shot_yes:  # if hits opposite color, then other dot dies
-                                    other.shot()
-                                if not other.get_shot_status():
-                                    self.shot()  # disapear bullet no matter what as long as other thing is not already shot
-                            else:
-                                if self.color != other.get_color() and not self.shot_yes:  # if hits opposite color, then other dot dies
-                                    if other.get_status() != 'player':
-                                        other.shot()
-                                if not other.get_shot_status():
-                                    self.shot()  # disapear bullet no matter what as long as other thing is not already shot
-
         if self.status == 'enemy' and not self.shot_yes:
             # this whole if statement also checks if enemy moving in the same direction as other dot is detected
             # check left side
@@ -348,30 +356,30 @@ class Dot:
                     # check that dot hasn't gone past enemy
                     if self.center[0] + self.radius > other.get_center()[0] + other.get_radius():
                         # check that color and vertical coordinates line up
-                        if other.get_color() != self.color and self.check_shoot_range(other, 'x'):
+                        if other.get_color() != self.color and self.check_range(other, 'x'):
                             return True
             # check right side
             if (other.get_center()[0] - other.get_radius()) - (self.center[0] + self.radius + 20) < 0:
                 if self.velocity[0] > 0:
                     if self.center[0] - self.radius < other.get_center()[0] - other.get_radius():
-                        if other.get_color() != self.color and self.check_shoot_range(other, 'x'):
+                        if other.get_color() != self.color and self.check_range(other, 'x'):
                             return True
             # check top side
-            if (self.center[1] - self.radius - 20) - (other.get_center()[1] + other.get_radius()) < 0:
+            if (self.center[1] - self.radius - 60) - (other.get_center()[1] + other.get_radius()) < 0:
                 if self.velocity[1] > 0:
                     if self.center[1] + self.radius < other.get_center()[1] + other.get_radius():
-                        if other.get_color() != self.color and self.check_shoot_range(other, 'y'):
+                        if other.get_color() != self.color and self.check_range(other, 'y'):
                             return True
             # check bottom side
             if (other.get_center()[1] - other.get_radius()) - (self.center[1] + self.radius + 20) < 0:
                 if self.velocity[1] < 0:
                     if self.center[1] - self.radius > other.get_center()[1] - other.get_radius():
-                        if other.get_color() != self.color and self.check_shoot_range(other, 'y'):
+                        if other.get_color() != self.color and self.check_range(other, 'y'):
                             return True
             return False
 
-    def check_shoot_range(self, other, side):
-        # after enemy checks if player in surrounding, check if player in shootable range
+    def check_range(self, other, side):
+        # checks if another dot is in  the surroundings of self
         if side == 'x':  # check vertical coordinates
             # check top side
             if other.get_center()[1] + other.get_radius() >= self.center[1] - self.radius:
