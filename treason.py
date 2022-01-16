@@ -156,6 +156,8 @@ class Game:
         # draw game text
         if self.play_game == False:
             self.display_instructions()
+        else:
+            self.display_level()
         if self.continue_game == False:
             self.display_game_over()
 
@@ -216,7 +218,7 @@ class Game:
                 self.level += 1
                 self.game_lives = 9
 
-                self.number_enemies *= self.level
+                self.number_enemies += 5
                 enemy_colors = ['red', 'green', 'orange']
                 self.enemy_dots = []
                 for i in range(self.number_enemies + 1):
@@ -301,6 +303,21 @@ class Game:
                          (self.surface.get_height() - text_box2.get_height()) // 4 + (text_adjust * 50))
             self.surface.blit(text_box2, location2)
             text_adjust += 1
+
+    def display_level(self):
+        # displays the level that you are on
+        words = 'LEVEL {}      lives: {}'.format(
+            self.level, int(self.game_lives))
+        # set font characteristics
+        font_size = 40
+        font = pygame.font.SysFont("", font_size)
+        fg_color = pygame.Color("white")
+        # create text box of string using font characteristics
+        text_box = font.render(words, True, fg_color, self.bg_color)
+        # location is top left corner
+        location = (10, 10)
+        # blit to game surface at location
+        self.surface.blit(text_box, location)
 
 
 class Dot:
@@ -417,11 +434,12 @@ class Dot:
                 if self.color == other.get_color() and other.get_status() != 'player':
                     other.shot()
                     if game_lives != 9:
-                        game_lives += 0.5
+                        game_lives += 1
                 else:
                     game_lives -= 1
-            if not other.get_shot_status() and self.status != 'player':
-                self.shot()  # disapear bullet no matter what as long as other thing is not already shot
+            if not other.get_shot_status():
+                if self.status != 'player' and self.status != 'player_bullet':
+                    self.shot()  # disapear bullet no matter what as long as other thing is not already shot
         return game_lives
 
     def check_surroundings(self, other):
