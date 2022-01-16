@@ -41,6 +41,7 @@ class Game:
         self.close_clicked = False
         self.continue_game = True
         self.play_game = False
+        self.level = 1
 
         # === game specific objects
         # player things
@@ -52,7 +53,7 @@ class Game:
         self.game_lives = 9
 
         # enemy things
-        self.number_enemies = 50
+        self.number_enemies = 10
         enemy_colors = ['red', 'green', 'orange']
         self.enemy_dots = []
         for i in range(self.number_enemies + 1):
@@ -179,8 +180,7 @@ class Game:
             for bullet in self.player_bullets:
                 bullet.move(self.frame_counter)
 
-        # update enemy things
-        if self.play_game:
+            # update enemy things
             for enemy in self.enemy_dots:
                 enemy.move(self.frame_counter)
                 enemy.boundary_stop()
@@ -195,7 +195,7 @@ class Game:
                                  self.surface, 'enemy_bullet')
                     self.enemy_bullets.append(bullet)
                 # also just shoot randomly every so often
-                if random.randint(0, 500) == 1:
+                if random.randint(0, 500) == 1 and not enemy.get_shot_status():
                     color = enemy.get_color()
                     center = enemy.get_center()
                     velocity = enemy.get_velocity()
@@ -206,19 +206,43 @@ class Game:
             for bullet in self.enemy_bullets:
                 bullet.move(self.frame_counter)
 
+            # check if level should be increased
+            change_level = True
+            for enemy in self.enemy_dots:
+                if not enemy.get_shot_status():
+                    change_level = False
+
+            if change_level:
+                self.level += 1
+                self.game_lives = 9
+
+                self.number_enemies *= self.level
+                enemy_colors = ['red', 'green', 'orange']
+                self.enemy_dots = []
+                for i in range(self.number_enemies + 1):
+                    color = random.choice(enemy_colors)
+                    radius = 9
+                    x = random.randint(
+                        radius, self.surface.get_width() - radius)
+                    y = random.randint(
+                        radius, self.surface.get_height() - radius)
+                    velocity_choices = [[-3, 0], [3, 0], [0, -3], [0, 3]]
+                    enemy = Dot(pygame.Color(color), pygame.Color(color), radius, [
+                                x, y], random.choice(velocity_choices), self.surface, 'enemy')
+                    self.enemy_dots.append(enemy)
+
+                self.enemy_bullets = []
+
         self.frame_counter = self.frame_counter + 1
 
     def decide_continue(self):
         # Check and remember if the game should continue
         # - self is the Game to check
         self.continue_game = False
-        for enemy in self.enemy_dots:
-            if not enemy.get_shot_status() and self.game_lives > 0:
-                self.continue_game = True
-        if self.game_lives <= 0:
-            self.end_game_reason = 'lives gone'
+        if self.game_lives > 0:
+            self.continue_game = True
         else:
-            self.end_game_reason = 'all dead'
+            self.end_game_reason = 'lives gone'
 
     def display_game_over(self):
         # displays game over message at end of game
