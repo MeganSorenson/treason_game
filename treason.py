@@ -40,10 +40,11 @@ class Game:
         self.game_Clock = pygame.time.Clock()
         self.close_clicked = False
         self.continue_game = True
+        self.play_game = False
 
         # === game specific objects
         # player things
-        self.player_dot = Dot(pygame.Color('red'), 10, [self.surface.get_width(
+        self.player_dot = Dot(pygame.Color('red'), pygame.Color('white'), 10, [self.surface.get_width(
         ) // 2, self.surface.get_height() // 2], [0, 0], self.surface, 'player')
 
         self.player_bullets = []
@@ -51,16 +52,16 @@ class Game:
         self.game_lives = 9
 
         # enemy things
-        self.number_enemies = 10
+        self.number_enemies = 50
         enemy_colors = ['red', 'green', 'orange']
         self.enemy_dots = []
         for i in range(self.number_enemies + 1):
             color = random.choice(enemy_colors)
-            radius = 15
+            radius = 9
             x = random.randint(radius, self.surface.get_width() - radius)
             y = random.randint(radius, self.surface.get_height() - radius)
             velocity_choices = [[-3, 0], [3, 0], [0, -3], [0, 3]]
-            enemy = Dot(pygame.Color(color), radius, [
+            enemy = Dot(pygame.Color(color), pygame.Color(color), radius, [
                         x, y], random.choice(velocity_choices), self.surface, 'enemy')
             self.enemy_dots.append(enemy)
 
@@ -75,7 +76,6 @@ class Game:
 
         while not self.close_clicked:  # until player clicks close box
             # play frame
-            print(self.game_lives)
             self.handle_events()
             self.draw()
             if self.continue_game:
@@ -102,28 +102,31 @@ class Game:
         color = self.player_dot.get_color()
         center = self.player_dot.get_center()
         velocity = self.player_dot.get_velocity()
-        # keys that move player ball
-        if event.key == pygame.K_UP:
-            self.player_dot.set_velocity((0, -4))
-        if event.key == pygame.K_DOWN:
-            self.player_dot.set_velocity((0, 4))
-        if event.key == pygame.K_LEFT:
-            self.player_dot.set_velocity((-4, 0))
-        if event.key == pygame.K_RIGHT:
-            self.player_dot.set_velocity((4, 0))
-        # key that shoots
-        if event.key == pygame.K_SPACE:
-            if velocity != [0, 0]:
-                bullet = Dot(color, 5, center, velocity,
-                             self.surface, 'player_bullet')
-                self.player_bullets.append(bullet)
-        # keys that change player ball color
-        if event.key == pygame.K_x:
-            self.player_dot.set_color(pygame.Color('red'))
-        if event.key == pygame.K_c:
-            self.player_dot.set_color(pygame.Color('orange'))
-        if event.key == pygame.K_v:
-            self.player_dot.set_color(pygame.Color('green'))
+        if event.key == pygame.K_m:
+            self.play_game = True
+        if self.play_game:
+            # keys that move player ball
+            if event.key == pygame.K_UP:
+                self.player_dot.set_velocity((0, -4))
+            if event.key == pygame.K_DOWN:
+                self.player_dot.set_velocity((0, 4))
+            if event.key == pygame.K_LEFT:
+                self.player_dot.set_velocity((-4, 0))
+            if event.key == pygame.K_RIGHT:
+                self.player_dot.set_velocity((4, 0))
+            # key that shoots
+            if event.key == pygame.K_SPACE:
+                if velocity != [0, 0]:
+                    bullet = Dot(color, color, 5, center, velocity,
+                                 self.surface, 'player_bullet')
+                    self.player_bullets.append(bullet)
+            # keys that change player ball color
+            if event.key == pygame.K_x:
+                self.player_dot.set_color(pygame.Color('red'))
+            if event.key == pygame.K_c:
+                self.player_dot.set_color(pygame.Color('orange'))
+            if event.key == pygame.K_v:
+                self.player_dot.set_color(pygame.Color('green'))
 
     def draw(self):
         # Draw all game objects.
@@ -132,21 +135,26 @@ class Game:
         self.surface.fill(self.bg_color)  # clear the display surface first
 
         # draw player things
-        self.player_dot.draw()
-        for bullet in self.player_bullets:
-            bullet.draw()
-            for enemy in self.enemy_dots:
-                bullet.check_bullet_shot(enemy, self.game_lives)
+        if self.play_game:
+            self.player_dot.draw()
+            for bullet in self.player_bullets:
+                bullet.draw()
+                for enemy in self.enemy_dots:
+                    self.game_lives = bullet.check_bullet_shot(
+                        enemy, self.game_lives)
 
         # draw enemy things
-        for enemy in self.enemy_dots:
-            enemy.draw()
-        for bullet in self.enemy_bullets:
-            bullet.draw()
-            self.game_lives = bullet.check_bullet_shot(
-                self.player_dot, self.game_lives)
+        if self.play_game:
+            for enemy in self.enemy_dots:
+                enemy.draw()
+            for bullet in self.enemy_bullets:
+                bullet.draw()
+                self.game_lives = bullet.check_bullet_shot(
+                    self.player_dot, self.game_lives)
 
         # draw game text
+        if self.play_game == False:
+            self.display_instructions()
         if self.continue_game == False:
             self.display_game_over()
 
@@ -154,8 +162,8 @@ class Game:
         if len(self.player_bullets) > 150:
             for i in range(50):
                 self.player_bullets.pop(0)
-        if len(self.enemy_bullets) > 250:
-            for i in range(50):
+        if len(self.enemy_bullets) > 1000:
+            for i in range(100):
                 self.enemy_bullets.pop(0)
 
         pygame.display.update()  # make the updated surface appear on the display
@@ -165,28 +173,38 @@ class Game:
         # - self is the Game to update
 
         # update player things
-        self.player_dot.move(self.frame_counter)
-        self.player_dot.boundary_stop()
-        for bullet in self.player_bullets:
-            bullet.move(self.frame_counter)
+        if self.play_game:
+            self.player_dot.move(self.frame_counter)
+            self.player_dot.boundary_stop()
+            for bullet in self.player_bullets:
+                bullet.move(self.frame_counter)
 
         # update enemy things
-        for enemy in self.enemy_dots:
-            enemy.move(self.frame_counter)
-            enemy.boundary_stop()
-            # check if player dot in enemy range
-            should_enemy_shoot = enemy.check_surroundings(self.player_dot)
-            # if yes, shoot at player
-            if should_enemy_shoot and self.frame_counter % 10 == 0:
-                color = enemy.get_color()
-                center = enemy.get_center()
-                velocity = enemy.get_velocity()
-                bullet = Dot(color, 5, center, velocity,
-                             self.surface, 'enemy_bullet')
-                self.enemy_bullets.append(bullet)
+        if self.play_game:
+            for enemy in self.enemy_dots:
+                enemy.move(self.frame_counter)
+                enemy.boundary_stop()
+                # check if player dot in enemy range
+                should_enemy_shoot = enemy.check_surroundings(self.player_dot)
+                # if yes, shoot at player
+                if should_enemy_shoot and self.frame_counter % 10 == 0:
+                    color = enemy.get_color()
+                    center = enemy.get_center()
+                    velocity = enemy.get_velocity()
+                    bullet = Dot(color, color, 5, center, velocity,
+                                 self.surface, 'enemy_bullet')
+                    self.enemy_bullets.append(bullet)
+                # also just shoot randomly every so often
+                if random.randint(0, 500) == 1:
+                    color = enemy.get_color()
+                    center = enemy.get_center()
+                    velocity = enemy.get_velocity()
+                    bullet = Dot(color, color, 5, center, velocity,
+                                 self.surface, 'enemy_bullet')
+                    self.enemy_bullets.append(bullet)
 
-        for bullet in self.enemy_bullets:
-            bullet.move(self.frame_counter)
+            for bullet in self.enemy_bullets:
+                bullet.move(self.frame_counter)
 
         self.frame_counter = self.frame_counter + 1
 
@@ -227,11 +245,44 @@ class Game:
         self.surface.blit(text_box1, location1)
         self.surface.blit(text_box2, location2)
 
+    def display_instructions(self):
+        # displays the instructions of the game until the player clicks m
+        line1 = '             Welcome to Treason:             '
+        line2 = '       you can only kill your own team       '
+        line3 = '        only other teams can kill you        '
+        line4 = "  change teams by clicking 'x', 'c', and 'v' "
+        line5 = '          use the arrow keys to move         '
+        line6 = '          use the spacebar to shoot          '
+        line7 = '              you have 9 lives               '
+        line8 = "             press 'm' to begin              "
+        smaller_lines = [line2, line3, line4, line5, line6, line7, line8]
+        # set font characteristics
+        font_size1 = 70
+        font_size2 = 40
+        font1 = pygame.font.SysFont("", font_size1)
+        font2 = pygame.font.SysFont("", font_size2)
+        fg_color = pygame.Color("white")
+        # create text box of string using font characteristics
+        text_box1 = font1.render(line1, True, fg_color, self.bg_color)
+        # location is middle of window
+        location1 = ((self.surface.get_width() - text_box1.get_width()) // 2,
+                     (self.surface.get_height() - text_box1.get_height()) // 4)
+        # blit to game surface at location
+        self.surface.blit(text_box1, location1)
+        # same for smaller lines
+        text_adjust = 1
+        for line in smaller_lines:
+            text_box2 = font2.render(line, True, fg_color, self.bg_color)
+            location2 = ((self.surface.get_width() - text_box2.get_width()) // 2,
+                         (self.surface.get_height() - text_box2.get_height()) // 4 + (text_adjust * 50))
+            self.surface.blit(text_box2, location2)
+            text_adjust += 1
+
 
 class Dot:
     # An object in this class represents a Dot that moves
 
-    def __init__(self, dot_color, dot_radius, dot_center, dot_velocity, surface, status):
+    def __init__(self, dot_color, outside_color, dot_radius, dot_center, dot_velocity, surface, status):
         # Initialize a Dot.
         # - self is the Dot to initialize
         # - color is the pygame.Color of the dot
@@ -243,6 +294,7 @@ class Dot:
         #   status is what type of dot it is
 
         self.color = dot_color
+        self.outside_color = outside_color
         self.radius = dot_radius
         self.center = dot_center
         self.velocity = dot_velocity
@@ -273,6 +325,8 @@ class Dot:
         else:
             pygame.draw.circle(self.surface, self.color,
                                self.center, self.radius)
+            pygame.draw.circle(self.surface, self.outside_color,
+                               self.center, self.radius, width=3)
 
     def set_velocity(self, formula):
         # sets the velocity of the dot
@@ -336,11 +390,13 @@ class Dot:
         # returns true is a player was hit by an enemy bullet
         if self.check_range(other, 'x') and self.check_range(other, 'y'):
             if not self.shot_yes:  # if hits opposite color, then other dot dies
-                if self.color == other.get_color() and other.get_status != 'player':
+                if self.color == other.get_color() and other.get_status() != 'player':
                     other.shot()
+                    if game_lives != 9:
+                        game_lives += 0.5
                 else:
                     game_lives -= 1
-            if not other.get_shot_status():
+            if not other.get_shot_status() and self.status != 'player':
                 self.shot()  # disapear bullet no matter what as long as other thing is not already shot
         return game_lives
 
