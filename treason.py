@@ -1,3 +1,9 @@
+# Treason
+# Version 1: Jan 16 2022
+# a single player game where you have to shoot your own team to win
+# Megan Sorenson -- megansage01@gmail.com
+# game framework heavily based on CMPUT174's game template at the University of Alberta
+
 import pygame
 import random
 
@@ -352,7 +358,7 @@ class Dot:
             for i in range(0, 2):
                 self.center[i] += self.velocity[i]
         else:
-            if random.randint(1, 10) % 2 == 0 and frames % 120 == 0:
+            if random.randint(0, 10) % 2 == 0 and frames % 60 == 0:
                 velocity_options = [[-3, 0], [3, 0], [0, -3], [0, 3]]
                 self.velocity = random.choice(velocity_options)
             for i in range(0, 2):
@@ -436,7 +442,8 @@ class Dot:
                     if game_lives != 9:
                         game_lives += 1
                 else:
-                    game_lives -= 1
+                    if game_lives > 0:
+                        game_lives -= 1
             if not other.get_shot_status():
                 if self.status != 'player' and self.status != 'player_bullet':
                     self.shot()  # disapear bullet no matter what as long as other thing is not already shot
