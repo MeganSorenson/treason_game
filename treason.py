@@ -441,7 +441,7 @@ class Dot:
                     other.shot()
                     if game_lives != 9:
                         game_lives += 1
-                else:
+                elif self.color != other.get_color() and other.get_status() == 'player':
                     if game_lives > 0:
                         game_lives -= 1
             if not other.get_shot_status():
